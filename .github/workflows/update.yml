@@ -31,8 +31,6 @@ jobs:
 
       - name: 抓取 B站 内容
         run: python3 scripts/fetch_bili.py
-      - name: 抓取 B站 内容
-        run: python3 scripts/fetch_bili.py
         env:
           BILI_SESSDATA: ${{ secrets.BILI_SESSDATA }}
 
