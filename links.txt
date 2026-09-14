@@ -16,7 +16,7 @@
 
 # 现场演出
 # https://www.bilibili.com/video/BV1xx411c7mD | 现场演出 | 视频 | 巡演
-https://www.bilibili.com/video/BV1yT9YBNEky/?spm_id_from=333.788.videopod.episodes&vd_source=190b05a8f7c418b62447091dac979b7f | 巡演
+https://www.bilibili.com/video/BV1yT9YBNEky/?spm_id_from=333.788.videopod.episodes&vd_source=190b05a8f7c418b62447091dac979b7f | 现场演出 | 视频 | 巡演
 # https://www.bilibili.com/video/BV1xx411c7mD | 节目与访谈 | 视频 | 团综
 
 # 成员日常
