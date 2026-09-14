@@ -12,7 +12,9 @@ fetch_bili.py —— 读取 links.txt，自动抓取 B站 视频信息
   本地：     python3 scripts/fetch_bili.py
   自动运行： GitHub Actions 会在 links.txt 变化时自动执行
 
-不需要任何第三方库，用 Python 自带的工具即可运行。
+提高成功率的两个开关（都不配也能跑）：
+  · 脚本会自动取一个 buvid3 设备标识带上，降低被风控的概率；
+  · 若仍频繁 412，可在仓库 Secrets 里加 BILI_SESSDATA（见 README）。
 """
 
 import json
@@ -20,6 +22,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -30,10 +33,15 @@ LINKS_FILE = os.path.join(ROOT, "links.txt")
 OUT_FILE = os.path.join(ROOT, "assets", "items-bili.js")
 
 API = "https://api.bilibili.com/x/web-interface/view"
+FINGER_API = "https://api.bilibili.com/x/frontend/finger/spi"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 TZ_CN = timezone(timedelta(hours=8))
-SLEEP = 1.2  # 每个请求之间的间隔，避免触发风控
+SLEEP = 2.0     # 每个视频之间的间隔（秒）
+RETRY = 3       # 单个请求最多尝试几次
+
+SESSDATA = os.environ.get("BILI_SESSDATA", "").strip()
+COOKIE_JAR = {"buvid3": ""}
 
 CAT_ALIAS = {
     "music": "music", "音乐作品": "music", "音乐": "music", "mv": "music",
@@ -84,14 +92,68 @@ def bvid_of(url):
     return ""
 
 
-def http_get(url):
-    req = urllib.request.Request(url, headers={
+def http_get(url, with_cookie=True, retries=None):
+    """带请求头、设备标识、Cookie 与重试的 GET，返回解析后的 JSON"""
+    if retries is None:
+        retries = RETRY
+
+    headers = {
         "User-Agent": UA,
         "Referer": "https://www.bilibili.com/",
         "Accept": "application/json, text/plain, */*",
-    })
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Origin": "https://www.bilibili.com",
+    }
+    if with_cookie:
+        jar = []
+        if COOKIE_JAR.get("buvid3"):
+            jar.append("buvid3=" + COOKIE_JAR["buvid3"])
+        if SESSDATA:
+            jar.append("SESSDATA=" + SESSDATA)
+        if jar:
+            headers["Cookie"] = "; ".join(jar)
+
+    last_err = None
+    for attempt in range(1, retries + 1):
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code in (412, 403, 429):
+                wait = attempt * 3
+                print("  · 第 %d/%d 次被拦截（HTTP %d），等 %d 秒后重试"
+                      % (attempt, retries, e.code, wait))
+                time.sleep(wait)
+                continue
+            raise
+        except Exception as e:
+            last_err = e
+            if attempt < retries:
+                print("  · 第 %d/%d 次请求异常：%s" % (attempt, retries, e))
+                time.sleep(attempt * 2)
+                continue
+            raise
+
+    raise last_err if last_err else RuntimeError("请求失败")
+
+
+def ensure_buvid3():
+    """先向 B站 要一枚设备标识，后续请求带上它，能明显降低被风控的概率"""
+    if COOKIE_JAR["buvid3"]:
+        return COOKIE_JAR["buvid3"]
+    try:
+        data = http_get(FINGER_API, with_cookie=False, retries=2)
+        b3 = ((data or {}).get("data") or {}).get("b_3") or ""
+        COOKIE_JAR["buvid3"] = b3
+        if b3:
+            print("已取得设备标识 buvid3。")
+        else:
+            print("· 未取得 buvid3，继续以匿名方式请求。")
+    except Exception as e:
+        print("· 获取 buvid3 失败（不影响继续）：" + str(e))
+    return COOKIE_JAR["buvid3"]
 
 
 def fmt_duration(sec):
@@ -130,6 +192,12 @@ def fetch_one(item):
 
     try:
         data = http_get(api)
+    except urllib.error.HTTPError as e:
+        if e.code == 412:
+            print("  ! 被风控拦截（HTTP 412）：建议配置 BILI_SESSDATA 后重试")
+        else:
+            print("  ! 请求失败：HTTP %s" % e.code)
+        return None
     except Exception as e:
         print("  ! 请求失败：" + str(e))
         return None
@@ -165,15 +233,35 @@ def main():
     rows = parse_links(LINKS_FILE)
     print("共读取到 %d 个链接。" % len(rows))
 
+    if not rows:
+        print("links.txt 里没有可用链接（以 # 开头的是注释，会被跳过）。")
+        return 0
+
+    ensure_buvid3()
+    if not SESSDATA:
+        print("提示：未配置 BILI_SESSDATA。若持续出现 412，建议按 README 补上。")
+
     out = []
+    failed = 0
     for i, item in enumerate(rows, 1):
         print("[%d/%d] %s" % (i, len(rows), item["url"]))
         got = fetch_one(item)
         if got:
             out.append(got)
             print("  ✓ " + got["title"])
+        else:
+            failed += 1
         if i < len(rows):
             time.sleep(SLEEP)
+
+    if failed:
+        print("\n本次有 %d 条没抓到。" % failed)
+
+    # 关键保护：一条都没抓到就不写入，避免把已有数据清空
+    if not out:
+        print("⚠ 一条都没抓到，已跳过写入，仓库里的旧数据保持不变。")
+        print("  常见原因是请求被风控拦截，解决办法见 README 的排查一节。")
+        return 1
 
     # 按日期倒序排列
     out.sort(key=lambda x: x.get("date", ""), reverse=True)
@@ -189,7 +277,10 @@ def main():
         f.write("window.COLLECTION = window.COLLECTION || { items: [] };\n")
         f.write("window.COLLECTION.updatedAt = %s;\n" % json.dumps(updated, ensure_ascii=False))
         f.write("window.COLLECTION.items.push(\n")
-        f.write(",\n".join("  " + json.dumps(o, ensure_ascii=False, indent=2).replace("\n", "\n  ") for o in out))
+        f.write(",\n".join(
+            "  " + json.dumps(o, ensure_ascii=False, indent=2).replace("\n", "\n  ")
+            for o in out
+        ))
         f.write("\n);\n")
 
     print("\n完成：成功 %d / 共 %d。已写入 %s" % (len(out), len(rows), OUT_FILE))
