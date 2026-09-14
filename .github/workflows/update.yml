@@ -6,13 +6,8 @@
 name: 更新 B站 内容
 
 on:
-  push:
-    paths:
-      - "links.txt"
-      - "scripts/fetch_bili.py"
   workflow_dispatch:
-  schedule:
-    - cron: "0 20 * * 0"
+
 
 permissions:
   contents: write
