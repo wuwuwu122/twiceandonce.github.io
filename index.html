@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>TWICE 收藏集 · 内容导航</title>
+<meta name="description" content="TWICE 相关视频、图集与文字内容的个人收藏与导航页面。" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+      <div class="brand-text">
+        <h1>TWICE 收藏集</h1>
+        <p>视频 · 图集 · 文字，一站式导航</p>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <section class="controls">
+    <div class="search">
+      <svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.6" cy="8.6" r="6.1" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M13.2 13.2 17.5 17.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="搜索标题、成员、关键词…" autocomplete="off" spellcheck="false" />
+      <button id="clear" class="clear" type="button" hidden aria-label="清空搜索">×</button>
+    </div>
+
+    <div class="filters">
+      <div class="frow">
+        <span class="flabel">年份</span>
+        <div class="fchips" id="years"></div>
+      </div>
+      <div class="frow">
+        <span class="flabel">媒介</span>
+        <div class="fchips" id="medias"></div>
+      </div>
+      <div class="frow">
+        <span class="flabel">平台</span>
+        <div class="fchips" id="plats"></div>
+        <button class="chip sort" id="sort" type="button" aria-pressed="false">时间 <b>↓</b> 最新在前</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="result-info" id="resultInfo"></div>
+
+  <section class="drawers" id="drawers" aria-label="分类内容"></section>
+
+  <section class="flat" id="flat" hidden aria-label="搜索结果"></section>
+
+  <div class="empty" id="empty" hidden>
+    <p class="empty-t">没有找到匹配的内容</p>
+    <p class="empty-h">试试更换关键词，或点下面的按钮清空筛选</p>
+    <button class="btn-reset" id="reset" type="button">清空全部筛选</button>
+  </div>
+
+  <footer class="foot">
+    <p>本站为个人内容收藏与导航页面，所有视频、图片与文字的版权归原作者与原平台所有。点击卡片将跳转至对应原站观看。</p>
+    <p class="foot-meta" id="footMeta"></p>
+  </footer>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/items-bili.js"></script>
+<script src="assets/items-manual.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
